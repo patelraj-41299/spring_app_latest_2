@@ -1,0 +1,37 @@
+version: 0.2
+
+phases:
+  pre_build:
+    commands:
+      - echo Installing jq...
+      - yum install -y jq
+      - echo Installing Maven...
+      - yum install -y maven
+      - echo Building the JAR file...
+      - mvn clean install
+      - echo Logging in to Docker Hub...
+      - DOCKER_USERNAME=$(aws secretsmanager get-secret-value --secret-id docker-hub-credentials1 --query SecretString --output text | jq -r .DOCKER_USERNAME)
+      - DOCKER_PASSWORD=$(aws secretsmanager get-secret-value --secret-id docker-hub-credentials1 --query SecretString --output text | jq -r .DOCKER_PASSWORD)
+      - echo "$DOCKER_PASSWORD" | docker login -u "$DOCKER_USERNAME" --password-stdin
+
+  build:
+    commands:
+      - echo Building the Docker image...
+      - docker build -t cicdncplimage .
+      - docker tag cicdncplimage:latest rajcosivadevops/cicdncplimage:latest
+
+  post_build:
+    commands:
+      - echo Pushing Docker image to Docker Hub...
+      - docker push rajcosivadevops/cicdncplimage:latest
+      - echo Writing imagedefinitions.json...
+      - ls -l
+      - printf '[{"name":"sprinrajco","imageUri":"rajcosivadevops/cicdncplimage:latest"}]' > imagedefinitions.json
+      - echo Writing appspec.yml...
+      
+
+artifacts:
+  files:
+    - imagedefinitions.json
+    - appspec.yml
+    - target/demo-1.0.0.jar
